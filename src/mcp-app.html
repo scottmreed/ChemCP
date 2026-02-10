@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ChemCP - Molecule Viewer</title>
+  <script src="https://unpkg.com/@rdkit/rdkit/dist/RDKit_minimal.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--font-sans, system-ui, -apple-system, sans-serif);
+      background: var(--color-background-primary, #ffffff);
+      color: var(--color-text-primary, #1a1a1a);
+    }
+
+    .container {
+      padding: 1rem;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 1rem;
+    }
+
+    .title {
+      font-size: var(--font-heading-lg-size, 1.5rem);
+      font-weight: var(--font-weight-semibold, 600);
+      margin: 0 0 0.25rem;
+    }
+
+    .subtitle {
+      color: var(--color-text-secondary, #666);
+      font-size: var(--font-text-sm-size, 0.85rem);
+      margin: 0;
+    }
+
+    .input-section {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .smiles-input {
+      flex: 1;
+      padding: 0.5rem 0.75rem;
+      border: 1px solid var(--color-border-primary, #d0d0d0);
+      border-radius: var(--border-radius-md, 6px);
+      font-family: var(--font-mono, monospace);
+      font-size: var(--font-text-sm-size, 0.875rem);
+      background: var(--color-background-primary, #fff);
+      color: var(--color-text-primary, #1a1a1a);
+      outline: none;
+    }
+
+    .smiles-input:focus {
+      border-color: var(--color-accent-primary, #2563eb);
+      box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+    }
+
+    .render-btn {
+      padding: 0.5rem 1rem;
+      background: var(--color-accent-primary, #2563eb);
+      color: #fff;
+      border: none;
+      border-radius: var(--border-radius-md, 6px);
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .render-btn:hover { opacity: 0.9; }
+    .render-btn:disabled { opacity: 0.5; cursor: default; }
+
+    .molecule-svg {
+      display: flex;
+      justify-content: center;
+      background: #fff;
+      border: 1px solid var(--color-border-primary, #e0e0e0);
+      border-radius: var(--border-radius-md, 8px);
+      padding: 0.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .molecule-svg svg {
+      max-width: 100%;
+      height: auto;
+    }
+
+    .properties {
+      background: var(--color-background-secondary, #f7f7f8);
+      border: 1px solid var(--color-border-primary, #e0e0e0);
+      border-radius: var(--border-radius-md, 8px);
+      padding: 0.75rem 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .properties h3 {
+      font-size: var(--font-text-sm-size, 0.85rem);
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      color: var(--color-text-secondary, #555);
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    .props-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.35rem 1.5rem;
+    }
+
+    .prop-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: var(--font-text-sm-size, 0.85rem);
+    }
+
+    .prop-label {
+      color: var(--color-text-secondary, #666);
+    }
+
+    .prop-value {
+      font-family: var(--font-mono, monospace);
+      font-weight: 500;
+    }
+
+    .canonical-smiles {
+      font-family: var(--font-mono, monospace);
+      font-size: var(--font-text-sm-size, 0.8rem);
+      color: var(--color-text-secondary, #555);
+      word-break: break-all;
+      padding: 0.4rem 0.6rem;
+      background: var(--color-background-secondary, #f0f0f0);
+      border-radius: 4px;
+      margin-bottom: 1rem;
+    }
+
+    .error {
+      color: var(--color-text-error, #dc3545);
+      background: #fdf2f2;
+      border: 1px solid #fecaca;
+      border-radius: var(--border-radius-md, 6px);
+      padding: 0.6rem 0.8rem;
+      font-size: var(--font-text-sm-size, 0.875rem);
+      margin-bottom: 1rem;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 2rem;
+      color: var(--color-text-secondary, #666);
+    }
+
+    .spinner {
+      width: 28px;
+      height: 28px;
+      border: 3px solid var(--color-border-primary, #e0e0e0);
+      border-top-color: var(--color-accent-primary, #2563eb);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      margin: 0 auto 0.75rem;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .examples {
+      text-align: center;
+      color: var(--color-text-secondary, #888);
+      font-size: var(--font-text-sm-size, 0.85rem);
+    }
+
+    .examples p { margin-bottom: 0.5rem; }
+
+    .example-btns {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      justify-content: center;
+    }
+
+    .example-btn {
+      padding: 0.3rem 0.6rem;
+      border: 1px solid var(--color-border-primary, #d0d0d0);
+      border-radius: 4px;
+      background: var(--color-background-primary, #fff);
+      color: var(--color-text-primary, #333);
+      font-size: 0.8rem;
+      cursor: pointer;
+      font-family: var(--font-mono, monospace);
+    }
+
+    .example-btn:hover {
+      border-color: var(--color-accent-primary, #2563eb);
+      background: rgba(37, 99, 235, 0.05);
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="module" src="./mcp-app.tsx"></script>
+</body>
+</html>
