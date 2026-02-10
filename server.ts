@@ -1,6 +1,5 @@
-console.log("Starting ChemCP MCP App server...");
-
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import {
   registerAppTool,
@@ -15,6 +14,19 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// Resolve the bundled HTML path.
+// Works both in dev (tsx server.ts -> dist/mcp-app.html)
+// and when compiled (dist/server.js -> mcp-app.html sibling)
+async function resolveHtmlPath(): Promise<string> {
+  const sibling = path.join(__dirname, "mcp-app.html");
+  try {
+    await fs.access(sibling);
+    return sibling;
+  } catch {
+    return path.join(__dirname, "dist", "mcp-app.html");
+  }
+}
 
 const server = new McpServer({
   name: "ChemCP",
@@ -66,10 +78,8 @@ registerAppResource(
     description: "Interactive molecule viewer powered by RDKit.js",
   },
   async () => {
-    const html = await fs.readFile(
-      path.join(__dirname, "dist", "mcp-app.html"),
-      "utf-8"
-    );
+    const htmlPath = await resolveHtmlPath();
+    const html = await fs.readFile(htmlPath, "utf-8");
     return {
       contents: [
         {
@@ -90,22 +100,32 @@ registerAppResource(
   }
 );
 
-// Expose the MCP server over HTTP
-const app = express();
-app.use(cors());
-app.use(express.json());
+// Start the server with the appropriate transport
+const useHttp = process.argv.includes("--http");
 
-app.post("/mcp", async (req, res) => {
-  const transport = new StreamableHTTPServerTransport({
-    sessionIdGenerator: undefined,
-    enableJsonResponse: true,
+if (useHttp) {
+  // HTTP mode — for development/testing with basic-host or cloudflared
+  const app = express();
+  app.use(cors());
+  app.use(express.json());
+
+  app.post("/mcp", async (req, res) => {
+    const transport = new StreamableHTTPServerTransport({
+      sessionIdGenerator: undefined,
+      enableJsonResponse: true,
+    });
+    res.on("close", () => transport.close());
+    await server.connect(transport);
+    await transport.handleRequest(req, res, req.body);
   });
-  res.on("close", () => transport.close());
-  await server.connect(transport);
-  await transport.handleRequest(req, res, req.body);
-});
 
-const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => {
-  console.log(`ChemCP server listening on http://localhost:${PORT}/mcp`);
-});
+  const PORT = process.env.PORT || 3001;
+  app.listen(PORT, () => {
+    console.error(`ChemCP server listening on http://localhost:${PORT}/mcp`);
+  });
+} else {
+  // stdio mode — standard for MCP clients (Claude Desktop, Claude Code, etc.)
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+  console.error("ChemCP MCP server started (stdio)");
+}

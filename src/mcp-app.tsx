@@ -49,6 +49,25 @@ const EXAMPLES = [
   { smiles: "OC[C@H]1OC(O)[C@H](O)[C@@H](O)[C@@H]1O", name: "Glucose" },
 ];
 
+// Color scheme options for molecule rendering
+const COLOR_SCHEMES = {
+  default: { name: "Default", atomColors: {} },
+  blackWhite: { 
+    name: "Black & White",
+    atomColors: { 6: [0, 0, 0], 7: [0, 0, 0], 8: [0, 0, 0], 9: [0, 0, 0], 15: [0, 0, 0], 16: [0, 0, 0], 17: [0, 0, 0], 35: [0, 0, 0] }
+  },
+  vibrant: {
+    name: "Vibrant",
+    atomColors: { 6: [0.2, 0.2, 0.2], 7: [0, 0, 1], 8: [1, 0, 0], 9: [0, 1, 0], 15: [1, 0.5, 0], 16: [1, 1, 0], 17: [0, 1, 0], 35: [0.5, 0, 0.5] }
+  },
+  pastel: {
+    name: "Pastel",
+    atomColors: { 6: [0.5, 0.5, 0.5], 7: [0.4, 0.4, 1], 8: [1, 0.4, 0.4], 9: [0.6, 1, 0.6], 15: [1, 0.7, 0.4], 16: [1, 1, 0.4], 17: [0.6, 1, 0.6], 35: [0.8, 0.4, 0.8] }
+  },
+};
+
+type ColorSchemeKey = keyof typeof COLOR_SCHEMES;
+
 function ChemCPApp() {
   const [smiles, setSmiles] = useState("");
   const [inputSmiles, setInputSmiles] = useState("");
@@ -57,6 +76,7 @@ function ChemCPApp() {
   const [error, setError] = useState("");
   const [rdkitLoading, setRdkitLoading] = useState(true);
   const [rdkitError, setRdkitError] = useState("");
+  const [colorScheme, setColorScheme] = useState<ColorSchemeKey>("default");
   const rdkitRef = useRef<RDKitModule | null>(null);
 
   const { app, isConnected } = useApp({
@@ -92,15 +112,15 @@ function ChemCPApp() {
     },
   });
 
-  // Initialize RDKit WASM module
+  // Initialize RDKit WASM module by dynamically loading the script
   useEffect(() => {
     let cancelled = false;
-    let attempts = 0;
-    const maxAttempts = 100; // 10 seconds max wait
+    let scriptAdded = false;
 
-    const tryInit = async () => {
+    const loadRDKit = async () => {
       if (cancelled) return;
 
+      // Check if already loaded
       if (typeof window.initRDKitModule === "function") {
         try {
           const mod = await window.initRDKitModule();
@@ -108,6 +128,7 @@ function ChemCPApp() {
             rdkitRef.current = mod;
             setRdkitLoading(false);
           }
+          return;
         } catch (e) {
           if (!cancelled) {
             setRdkitError(
@@ -115,30 +136,74 @@ function ChemCPApp() {
             );
             setRdkitLoading(false);
           }
+          return;
         }
-      } else {
-        attempts++;
-        if (attempts >= maxAttempts) {
+      }
+
+      // Dynamically load the script
+      if (!scriptAdded) {
+        scriptAdded = true;
+        const script = document.createElement("script");
+        script.src = "https://unpkg.com/@rdkit/rdkit/dist/RDKit_minimal.js";
+        script.async = true;
+
+        script.onload = async () => {
+          if (cancelled) return;
+          // Wait a bit for the global to be available
+          let attempts = 0;
+          const checkInit = async () => {
+            if (cancelled) return;
+            if (typeof window.initRDKitModule === "function") {
+              try {
+                const mod = await window.initRDKitModule();
+                if (!cancelled) {
+                  rdkitRef.current = mod;
+                  setRdkitLoading(false);
+                }
+              } catch (e) {
+                if (!cancelled) {
+                  setRdkitError(
+                    `Failed to initialize RDKit: ${e instanceof Error ? e.message : e}`
+                  );
+                  setRdkitLoading(false);
+                }
+              }
+            } else {
+              attempts++;
+              if (attempts < 50) {
+                setTimeout(checkInit, 100);
+              } else {
+                if (!cancelled) {
+                  setRdkitError("RDKit initialization timed out");
+                  setRdkitLoading(false);
+                }
+              }
+            }
+          };
+          checkInit();
+        };
+
+        script.onerror = () => {
           if (!cancelled) {
             setRdkitError(
-              "RDKit.js failed to load from CDN. The host may need to allow unpkg.com in CSP."
+              "Failed to load RDKit.js from unpkg.com. Please check your internet connection or try again later."
             );
             setRdkitLoading(false);
           }
-        } else {
-          setTimeout(tryInit, 100);
-        }
+        };
+
+        document.head.appendChild(script);
       }
     };
 
-    tryInit();
+    loadRDKit();
     return () => {
       cancelled = true;
     };
   }, []);
 
   // Render a molecule from SMILES using RDKit
-  const renderMolecule = useCallback((smilesStr: string) => {
+  const renderMolecule = useCallback((smilesStr: string, scheme: ColorSchemeKey) => {
     const RDKit = rdkitRef.current;
     if (!RDKit || !smilesStr.trim()) return;
 
@@ -155,12 +220,17 @@ function ChemCPApp() {
         return;
       }
 
-      // Render SVG
+      // Render SVG with color scheme
       let svg: string;
       try {
-        svg = mol.get_svg_with_highlights(
-          JSON.stringify({ width: 450, height: 300 })
-        );
+        const drawOptions: any = { width: 450, height: 300 };
+        
+        // Apply custom atom colors if not default scheme
+        if (scheme !== "default" && COLOR_SCHEMES[scheme].atomColors) {
+          drawOptions.atomColourPalette = COLOR_SCHEMES[scheme].atomColors;
+        }
+        
+        svg = mol.get_svg_with_highlights(JSON.stringify(drawOptions));
       } catch {
         // Fallback if get_svg_with_highlights doesn't accept size options
         try {
@@ -237,12 +307,12 @@ function ChemCPApp() {
     }
   }, []);
 
-  // Re-render when SMILES changes (from tool result or user input)
+  // Re-render when SMILES or color scheme changes
   useEffect(() => {
     if (smiles && !rdkitLoading && rdkitRef.current) {
-      renderMolecule(smiles);
+      renderMolecule(smiles, colorScheme);
     }
-  }, [smiles, rdkitLoading, renderMolecule]);
+  }, [smiles, colorScheme, rdkitLoading, renderMolecule]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -262,7 +332,7 @@ function ChemCPApp() {
       <div className="container">
         <div className="header">
           <h1 className="title">ChemCP</h1>
-          <p className="subtitle">Molecule Viewer</p>
+          <p className="subtitle">Molecule Viewer from ChemIllusion</p>
         </div>
         <div className="loading">
           <div className="spinner" />
@@ -278,7 +348,7 @@ function ChemCPApp() {
       <div className="container">
         <div className="header">
           <h1 className="title">ChemCP</h1>
-          <p className="subtitle">Molecule Viewer</p>
+          <p className="subtitle">Molecule Viewer from ChemIllusion</p>
         </div>
         <div className="error">{rdkitError}</div>
       </div>
@@ -308,6 +378,24 @@ function ChemCPApp() {
           Render
         </button>
       </form>
+
+      {svgHtml && (
+        <div className="color-scheme-section">
+          <label htmlFor="color-scheme">Color Scheme:</label>
+          <select
+            id="color-scheme"
+            value={colorScheme}
+            onChange={(e) => setColorScheme(e.target.value as ColorSchemeKey)}
+            className="color-scheme-select"
+          >
+            {Object.entries(COLOR_SCHEMES).map(([key, scheme]) => (
+              <option key={key} value={key}>
+                {scheme.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {error && <div className="error">{error}</div>}
 
@@ -416,6 +504,19 @@ function ChemCPApp() {
           </div>
         </div>
       )}
+
+      <div className="chemillusion-link">
+        <p>
+          For more complex molecule interactions, try{" "}
+          <a
+            href="https://chemillusion.com"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            ChemIllusion
+          </a>
+        </p>
+      </div>
     </div>
   );
 }

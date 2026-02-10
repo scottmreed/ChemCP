@@ -1,0 +1,20 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.scottmreed/ChemCP",
+  "description": "MCP App that renders 2D molecular structures from SMILES using RDKit.js",
+  "repository": {
+    "url": "https://github.com/scottmreed/ChemCP",
+    "source": "github"
+  },
+  "version": "1.0.5",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "chemcp",
+      "version": "1.0.5",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ]
+}

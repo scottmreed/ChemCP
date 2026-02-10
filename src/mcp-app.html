@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ChemCP - Molecule Viewer</title>
-  <script src="https://unpkg.com/@rdkit/rdkit/dist/RDKit_minimal.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -73,6 +72,40 @@
 
     .render-btn:hover { opacity: 0.9; }
     .render-btn:disabled { opacity: 0.5; cursor: default; }
+
+    .color-scheme-section {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+      justify-content: flex-end;
+    }
+
+    .color-scheme-section label {
+      font-size: var(--font-text-sm-size, 0.875rem);
+      color: var(--color-text-secondary, #666);
+      font-weight: 500;
+    }
+
+    .color-scheme-select {
+      padding: 0.4rem 0.6rem;
+      border: 1px solid var(--color-border-primary, #d0d0d0);
+      border-radius: var(--border-radius-md, 6px);
+      background: var(--color-background-primary, #fff);
+      color: var(--color-text-primary, #1a1a1a);
+      font-size: var(--font-text-sm-size, 0.875rem);
+      cursor: pointer;
+      outline: none;
+    }
+
+    .color-scheme-select:focus {
+      border-color: var(--color-accent-primary, #2563eb);
+      box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+    }
+
+    .color-scheme-select:hover {
+      border-color: var(--color-border-secondary, #a0a0a0);
+    }
 
     .molecule-svg {
       display: flex;
@@ -195,6 +228,25 @@
     .example-btn:hover {
       border-color: var(--color-accent-primary, #2563eb);
       background: rgba(37, 99, 235, 0.05);
+    }
+
+    .chemillusion-link {
+      text-align: center;
+      color: var(--color-text-secondary, #888);
+      font-size: var(--font-text-sm-size, 0.85rem);
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--color-border-primary, #e0e0e0);
+    }
+
+    .chemillusion-link a {
+      color: var(--color-accent-primary, #2563eb);
+      text-decoration: none;
+      font-weight: 500;
+    }
+
+    .chemillusion-link a:hover {
+      text-decoration: underline;
     }
   </style>
 </head>

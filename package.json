@@ -1,25 +1,44 @@
 {
   "name": "chemcp",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "version": "1.0.5",
+  "type": "module",
+  "description": "MCP App that renders 2D molecular structures from SMILES using RDKit.js",
+  "mcpName": "io.github.scottmreed/ChemCP",
+  "main": "dist/server.js",
+  "bin": {
+    "chemcp": "bin/chemcp.js"
+  },
+  "files": [
+    "dist/server.js",
+    "dist/mcp-app.html",
+    "bin/"
+  ],
   "scripts": {
-    "build": "vite build && cp dist/src/mcp-app.html dist/mcp-app.html",
+    "build": "vite build && cp dist/src/mcp-app.html dist/mcp-app.html && tsc -p tsconfig.build.json",
     "serve": "tsx server.ts",
-    "dev": "concurrently \"npm run build -- --watch\" \"npm run serve\"",
-    "start": "npm run build && npm run serve",
+    "serve:http": "tsx server.ts --http",
+    "dev": "concurrently \"npm run build -- --watch\" \"npm run serve:http\"",
+    "start": "npm run build && npm run serve:http",
+    "prepublishOnly": "npm run build",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "mcp",
+    "mcp-app",
+    "chemistry",
+    "rdkit",
+    "smiles",
+    "molecule",
+    "visualization"
+  ],
+  "author": "scottreed",
   "license": "ISC",
   "dependencies": {
     "@modelcontextprotocol/ext-apps": "^1.0.1",
     "@modelcontextprotocol/sdk": "^1.26.0",
     "cors": "^2.8.6",
     "express": "^5.2.1",
-    "react": "^19.2.4",
-    "react-dom": "^19.2.4"
+    "zod": "^3.25 || ^4.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
@@ -29,6 +48,8 @@
     "@types/react-dom": "^19.2.3",
     "concurrently": "^9.2.1",
     "cross-env": "^10.1.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "vite": "^7.3.1",
