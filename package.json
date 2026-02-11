@@ -1,6 +1,6 @@
 {
   "name": "chemcp",
-  "version": "1.0.5",
+  "version": "1.1.0",
   "type": "module",
   "description": "MCP App that renders 2D molecular structures from SMILES using RDKit.js",
   "mcpName": "io.github.scottmreed/ChemCP",
