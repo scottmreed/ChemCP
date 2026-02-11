@@ -73,39 +73,6 @@
     .render-btn:hover { opacity: 0.9; }
     .render-btn:disabled { opacity: 0.5; cursor: default; }
 
-    .color-scheme-section {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      margin-bottom: 1rem;
-      justify-content: flex-end;
-    }
-
-    .color-scheme-section label {
-      font-size: var(--font-text-sm-size, 0.875rem);
-      color: var(--color-text-secondary, #666);
-      font-weight: 500;
-    }
-
-    .color-scheme-select {
-      padding: 0.4rem 0.6rem;
-      border: 1px solid var(--color-border-primary, #d0d0d0);
-      border-radius: var(--border-radius-md, 6px);
-      background: var(--color-background-primary, #fff);
-      color: var(--color-text-primary, #1a1a1a);
-      font-size: var(--font-text-sm-size, 0.875rem);
-      cursor: pointer;
-      outline: none;
-    }
-
-    .color-scheme-select:focus {
-      border-color: var(--color-accent-primary, #2563eb);
-      box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
-    }
-
-    .color-scheme-select:hover {
-      border-color: var(--color-border-secondary, #a0a0a0);
-    }
 
     .molecule-svg {
       display: flex;
@@ -247,6 +214,215 @@
 
     .chemillusion-link a:hover {
       text-decoration: underline;
+    }
+
+    /* Comparison UI Styles */
+    .comparison-toggle {
+      text-align: center;
+      margin: 1rem 0;
+    }
+
+    .comparison-toggle-btn {
+      padding: 0.5rem 1rem;
+      background: var(--color-accent-primary, #2563eb);
+      color: #fff;
+      border: none;
+      border-radius: var(--border-radius-md, 6px);
+      font-weight: 500;
+      cursor: pointer;
+      font-size: var(--font-text-sm-size, 0.875rem);
+    }
+
+    .comparison-toggle-btn:hover {
+      opacity: 0.9;
+    }
+
+    .comparison-section {
+      background: var(--color-background-secondary, #f7f7f8);
+      border: 1px solid var(--color-border-primary, #e0e0e0);
+      border-radius: var(--border-radius-md, 8px);
+      padding: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .comparison-section h3 {
+      font-size: var(--font-text-sm-size, 0.875rem);
+      font-weight: 600;
+      margin: 0 0 0.75rem;
+      color: var(--color-text-secondary, #555);
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      text-align: center;
+    }
+
+    .fingerprint-selector {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+      justify-content: center;
+    }
+
+    .fingerprint-selector label {
+      font-size: var(--font-text-sm-size, 0.875rem);
+      color: var(--color-text-secondary, #666);
+      font-weight: 500;
+    }
+
+    .fingerprint-select {
+      padding: 0.4rem 0.6rem;
+      border: 1px solid var(--color-border-primary, #d0d0d0);
+      border-radius: var(--border-radius-md, 6px);
+      background: var(--color-background-primary, #fff);
+      color: var(--color-text-primary, #1a1a1a);
+      font-size: var(--font-text-sm-size, 0.875rem);
+      cursor: pointer;
+      outline: none;
+      min-width: 200px;
+    }
+
+    .fingerprint-select:focus {
+      border-color: var(--color-accent-primary, #2563eb);
+      box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+    }
+
+    .comparison-examples {
+      text-align: center;
+      margin-bottom: 1rem;
+    }
+
+    .comparison-examples p {
+      font-size: var(--font-text-sm-size, 0.85rem);
+      color: var(--color-text-secondary, #666);
+      margin-bottom: 0.5rem;
+    }
+
+    .comparison-examples .example-btns {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      justify-content: center;
+    }
+
+    .comparison-examples .example-btn {
+      padding: 0.3rem 0.6rem;
+      border: 1px solid var(--color-border-primary, #d0d0d0);
+      border-radius: 4px;
+      background: var(--color-background-primary, #fff);
+      color: var(--color-text-primary, #333);
+      font-size: 0.75rem;
+      cursor: pointer;
+      font-family: var(--font-mono, monospace);
+    }
+
+    .comparison-examples .example-btn:hover {
+      border-color: var(--color-accent-primary, #2563eb);
+      background: rgba(37, 99, 235, 0.05);
+    }
+
+    .clear-btn {
+      padding: 0.5rem 1rem;
+      background: var(--color-text-error, #dc3545);
+      color: #fff;
+      border: none;
+      border-radius: var(--border-radius-md, 6px);
+      font-weight: 500;
+      cursor: pointer;
+      font-size: var(--font-text-sm-size, 0.875rem);
+    }
+
+    .clear-btn:hover {
+      opacity: 0.9;
+    }
+
+    .similarity-score {
+      text-align: center;
+      margin-bottom: 1.5rem;
+      padding: 1rem;
+      background: #fff;
+      border-radius: var(--border-radius-md, 8px);
+      border: 1px solid var(--color-border-primary, #e0e0e0);
+    }
+
+    .similarity-score h4 {
+      font-size: var(--font-text-sm-size, 0.875rem);
+      font-weight: 600;
+      margin: 0 0 0.75rem;
+      color: var(--color-text-primary, #1a1a1a);
+    }
+
+    .similarity-bar {
+      width: 100%;
+      height: 20px;
+      background: #e5e7eb;
+      border-radius: 10px;
+      overflow: hidden;
+      margin-bottom: 0.5rem;
+    }
+
+    .similarity-fill {
+      height: 100%;
+      transition: width 0.3s ease, background-color 0.3s ease;
+    }
+
+    .similarity-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: var(--font-text-sm-size, 0.75rem);
+      color: var(--color-text-secondary, #666);
+      font-family: var(--font-mono, monospace);
+    }
+
+    .molecules-comparison {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+
+    .molecule-panel {
+      background: #fff;
+      border: 1px solid var(--color-border-primary, #e0e0e0);
+      border-radius: var(--border-radius-md, 8px);
+      padding: 1rem;
+    }
+
+    .molecule-panel h4 {
+      font-size: var(--font-text-sm-size, 0.875rem);
+      font-weight: 600;
+      margin: 0 0 0.75rem;
+      color: var(--color-text-secondary, #555);
+      text-align: center;
+    }
+
+    .molecule-panel .molecule-svg {
+      margin-bottom: 0.75rem;
+    }
+
+    .molecule-panel .canonical-smiles {
+      font-size: var(--font-text-sm-size, 0.75rem);
+      word-break: break-all;
+      text-align: center;
+    }
+
+    /* Mobile responsive */
+    @media (max-width: 768px) {
+      .molecules-comparison {
+        grid-template-columns: 1fr;
+        gap: 0.75rem;
+      }
+
+      .fingerprint-selector {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .fingerprint-select {
+        min-width: auto;
+      }
+
+      .comparison-section {
+        padding: 0.75rem;
+      }
     }
   </style>
 </head>

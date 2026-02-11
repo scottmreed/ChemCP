@@ -21,6 +21,10 @@ interface RDKitMol {
   get_smiles(): string;
   get_descriptors(): string;
   get_inchi(): string;
+  get_morgan_fp(params?: string): string;
+  get_morgan_fp_as_binary_text(params?: string): string;
+  get_pattern_fp(): string;
+  get_pattern_fp_as_binary_text(): string;
   delete(): void;
 }
 
@@ -40,6 +44,11 @@ interface MolProperties {
   fractionCSP3: string;
 }
 
+interface FingerprintData {
+  binary: string; // Binary string representation
+  type: 'morgan' | 'pattern';
+}
+
 const EXAMPLES = [
   { smiles: "CCO", name: "Ethanol" },
   { smiles: "c1ccccc1", name: "Benzene" },
@@ -49,24 +58,57 @@ const EXAMPLES = [
   { smiles: "OC[C@H]1OC(O)[C@H](O)[C@@H](O)[C@@H]1O", name: "Glucose" },
 ];
 
-// Color scheme options for molecule rendering
-const COLOR_SCHEMES = {
-  default: { name: "Default", atomColors: {} },
-  blackWhite: { 
-    name: "Black & White",
-    atomColors: { 6: [0, 0, 0], 7: [0, 0, 0], 8: [0, 0, 0], 9: [0, 0, 0], 15: [0, 0, 0], 16: [0, 0, 0], 17: [0, 0, 0], 35: [0, 0, 0] }
+const COMPARISON_EXAMPLES = [
+  {
+    reference: { smiles: "CC(=O)Oc1ccccc1C(=O)O", name: "Aspirin" },
+    comparison: { smiles: "Oc1ccccc1C(=O)O", name: "Salicylic Acid" },
+    expectedSimilarity: 0.65
   },
-  vibrant: {
-    name: "Vibrant",
-    atomColors: { 6: [0.2, 0.2, 0.2], 7: [0, 0, 1], 8: [1, 0, 0], 9: [0, 1, 0], 15: [1, 0.5, 0], 16: [1, 1, 0], 17: [0, 1, 0], 35: [0.5, 0, 0.5] }
+  {
+    reference: { smiles: "CN1C=NC2=C1C(=O)N(C(=O)N2C)C", name: "Caffeine" },
+    comparison: { smiles: "Cn1cnc2c1c(=O)[nH]c(=O)n2C", name: "Theobromine" },
+    expectedSimilarity: 0.85
   },
-  pastel: {
-    name: "Pastel",
-    atomColors: { 6: [0.5, 0.5, 0.5], 7: [0.4, 0.4, 1], 8: [1, 0.4, 0.4], 9: [0.6, 1, 0.6], 15: [1, 0.7, 0.4], 16: [1, 1, 0.4], 17: [0.6, 1, 0.6], 35: [0.8, 0.4, 0.8] }
+  {
+    reference: { smiles: "c1ccccc1", name: "Benzene" },
+    comparison: { smiles: "CCO", name: "Ethanol" },
+    expectedSimilarity: 0.1
   },
+];
+
+// Tanimoto similarity calculation for binary fingerprints
+function calculateTanimoto(fp1: string, fp2: string): number {
+  let intersection = 0;
+  let union = 0;
+
+  for (let i = 0; i < fp1.length; i++) {
+    const bit1 = fp1[i] === '1' ? 1 : 0;
+    const bit2 = fp2[i] === '1' ? 1 : 0;
+
+    if (bit1 === 1 || bit2 === 1) union++;
+    if (bit1 === 1 && bit2 === 1) intersection++;
+  }
+
+  return union === 0 ? 0 : intersection / union;
+}
+
+// Generate fingerprint using RDKit.js
+const generateFingerprint = (mol: RDKitMol, type: 'morgan' | 'pattern'): string | null => {
+  try {
+    if (type === 'morgan') {
+      // Morgan fingerprint (ECFP4): radius=2, nBits=2048
+      const params = JSON.stringify({ radius: 2, nBits: 2048 });
+      return mol.get_morgan_fp_as_binary_text(params);
+    } else {
+      // RDKit pattern (topological) fingerprint
+      return mol.get_pattern_fp_as_binary_text();
+    }
+  } catch (e) {
+    console.error(`Failed to generate ${type} fingerprint:`, e);
+    return null;
+  }
 };
 
-type ColorSchemeKey = keyof typeof COLOR_SCHEMES;
 
 function ChemCPApp() {
   const [smiles, setSmiles] = useState("");
@@ -76,7 +118,13 @@ function ChemCPApp() {
   const [error, setError] = useState("");
   const [rdkitLoading, setRdkitLoading] = useState(true);
   const [rdkitError, setRdkitError] = useState("");
-  const [colorScheme, setColorScheme] = useState<ColorSchemeKey>("default");
+  const [compareSmiles, setCompareSmiles] = useState("");
+  const [compareInputSmiles, setCompareInputSmiles] = useState("");
+  const [compareSvgHtml, setCompareSvgHtml] = useState("");
+  const [compareProperties, setCompareProperties] = useState<MolProperties | null>(null);
+  const [fingerprintType, setFingerprintType] = useState<'morgan' | 'pattern'>('morgan');
+  const [tanimotoScore, setTanimotoScore] = useState<number | null>(null);
+  const [showComparison, setShowComparison] = useState(false);
   const rdkitRef = useRef<RDKitModule | null>(null);
 
   const { app, isConnected } = useApp({
@@ -203,7 +251,7 @@ function ChemCPApp() {
   }, []);
 
   // Render a molecule from SMILES using RDKit
-  const renderMolecule = useCallback((smilesStr: string, scheme: ColorSchemeKey) => {
+  const renderMolecule = useCallback((smilesStr: string, isComparison: boolean = false) => {
     const RDKit = rdkitRef.current;
     if (!RDKit || !smilesStr.trim()) return;
 
@@ -213,23 +261,23 @@ function ChemCPApp() {
     try {
       mol = RDKit.get_mol(smilesStr);
       if (!mol || !mol.is_valid()) {
-        setError(`Invalid SMILES: "${smilesStr}"`);
-        setSvgHtml("");
-        setProperties(null);
+        const errorMsg = `Invalid SMILES: "${smilesStr}"`;
+        setError(errorMsg);
+        if (isComparison) {
+          setCompareSvgHtml("");
+          setCompareProperties(null);
+        } else {
+          setSvgHtml("");
+          setProperties(null);
+        }
         if (mol) mol.delete();
         return;
       }
 
-      // Render SVG with color scheme
+      // Render SVG
       let svg: string;
       try {
         const drawOptions: any = { width: 450, height: 300 };
-        
-        // Apply custom atom colors if not default scheme
-        if (scheme !== "default" && COLOR_SCHEMES[scheme].atomColors) {
-          drawOptions.atomColourPalette = COLOR_SCHEMES[scheme].atomColors;
-        }
-        
         svg = mol.get_svg_with_highlights(JSON.stringify(drawOptions));
       } catch {
         // Fallback if get_svg_with_highlights doesn't accept size options
@@ -239,7 +287,11 @@ function ChemCPApp() {
           svg = mol.get_svg();
         }
       }
-      setSvgHtml(svg);
+      if (isComparison) {
+        setCompareSvgHtml(svg);
+      } else {
+        setSvgHtml(svg);
+      }
 
       // Get canonical SMILES
       const canonical = mol.get_smiles();
@@ -295,24 +347,68 @@ function ChemCPApp() {
         // Descriptors unavailable, just show SMILES
       }
 
-      setProperties(props);
+      // Generate fingerprint for similarity comparison
+      let fingerprint: string | null = null;
+      try {
+        fingerprint = generateFingerprint(mol, fingerprintType);
+      } catch (e) {
+        console.warn('Failed to generate fingerprint:', e);
+      }
+
+      // Calculate Tanimoto similarity if we have both molecules and this is a comparison
+      if (isComparison && fingerprint && compareSmiles) {
+        // This is a comparison molecule, calculate similarity with main molecule
+        try {
+          const mainMol = rdkitRef.current?.get_mol(smiles);
+          if (mainMol && mainMol.is_valid()) {
+            const mainFingerprint = generateFingerprint(mainMol, fingerprintType);
+            if (mainFingerprint && fingerprint) {
+              const similarity = calculateTanimoto(mainFingerprint, fingerprint);
+              setTanimotoScore(similarity);
+            }
+            mainMol.delete();
+          }
+        } catch (e) {
+          console.warn('Failed to calculate similarity:', e);
+        }
+      }
+
+      if (isComparison) {
+        setCompareProperties(props);
+      } else {
+        setProperties(props);
+      }
+
       mol.delete();
     } catch (e) {
-      setError(`Error rendering molecule: ${e instanceof Error ? e.message : e}`);
-      setSvgHtml("");
-      setProperties(null);
+      const errorMsg = `Error rendering molecule: ${e instanceof Error ? e.message : e}`;
+      setError(errorMsg);
+      if (isComparison) {
+        setCompareSvgHtml("");
+        setCompareProperties(null);
+      } else {
+        setSvgHtml("");
+        setProperties(null);
+      }
       if (mol) {
         try { mol.delete(); } catch { /* ignore */ }
       }
     }
   }, []);
 
-  // Re-render when SMILES or color scheme changes
+  // Re-render when SMILES changes
   useEffect(() => {
     if (smiles && !rdkitLoading && rdkitRef.current) {
-      renderMolecule(smiles, colorScheme);
+      renderMolecule(smiles);
     }
-  }, [smiles, colorScheme, rdkitLoading, renderMolecule]);
+  }, [smiles, rdkitLoading, renderMolecule]);
+
+  // Re-render when comparison SMILES changes
+  useEffect(() => {
+    if (compareSmiles && !rdkitLoading && rdkitRef.current) {
+      renderMolecule(compareSmiles, true);
+    }
+  }, [compareSmiles, rdkitLoading, renderMolecule, fingerprintType]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -324,6 +420,35 @@ function ChemCPApp() {
   const loadExample = (exampleSmiles: string) => {
     setInputSmiles(exampleSmiles);
     setSmiles(exampleSmiles);
+  };
+
+  const handleCompareSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (compareInputSmiles.trim()) {
+      setCompareSmiles(compareInputSmiles.trim());
+    }
+  };
+
+  const clearComparison = () => {
+    setCompareSmiles("");
+    setCompareInputSmiles("");
+    setCompareSvgHtml("");
+    setCompareProperties(null);
+    setTanimotoScore(null);
+  };
+
+  const toggleComparison = () => {
+    setShowComparison(!showComparison);
+    if (showComparison) {
+      clearComparison();
+    }
+  };
+
+  const loadComparisonExample = (referenceSmiles: string, comparisonSmiles: string) => {
+    setSmiles(referenceSmiles);
+    setInputSmiles(referenceSmiles);
+    setCompareSmiles(comparisonSmiles);
+    setCompareInputSmiles(comparisonSmiles);
   };
 
   // RDKit still loading
@@ -379,23 +504,6 @@ function ChemCPApp() {
         </button>
       </form>
 
-      {svgHtml && (
-        <div className="color-scheme-section">
-          <label htmlFor="color-scheme">Color Scheme:</label>
-          <select
-            id="color-scheme"
-            value={colorScheme}
-            onChange={(e) => setColorScheme(e.target.value as ColorSchemeKey)}
-            className="color-scheme-select"
-          >
-            {Object.entries(COLOR_SCHEMES).map(([key, scheme]) => (
-              <option key={key} value={key}>
-                {scheme.name}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
 
       {error && <div className="error">{error}</div>}
 
@@ -486,6 +594,117 @@ function ChemCPApp() {
             </div>
           </div>
         </>
+      )}
+
+      {svgHtml && (
+        <div className="comparison-toggle">
+          <button
+            type="button"
+            className="comparison-toggle-btn"
+            onClick={toggleComparison}
+          >
+            {showComparison ? 'Hide Comparison' : 'Compare Molecules'}
+          </button>
+        </div>
+      )}
+
+      {showComparison && (
+        <div className="comparison-section">
+          <h3>Molecular Similarity Comparison</h3>
+
+          <div className="fingerprint-selector">
+            <label htmlFor="fingerprint-type">Fingerprint Type:</label>
+            <select
+              id="fingerprint-type"
+              value={fingerprintType}
+              onChange={(e) => setFingerprintType(e.target.value as 'morgan' | 'pattern')}
+              className="fingerprint-select"
+            >
+              <option value="morgan">Morgan (ECFP4) - Recommended</option>
+              <option value="pattern">Pattern (Topological)</option>
+            </select>
+          </div>
+
+          <div className="comparison-examples">
+            <p>Try example comparisons:</p>
+            <div className="example-btns">
+              {COMPARISON_EXAMPLES.map((example, index) => (
+                <button
+                  key={index}
+                  className="example-btn"
+                  onClick={() => loadComparisonExample(example.reference.smiles, example.comparison.smiles)}
+                  title={`Compare ${example.reference.name} vs ${example.comparison.name} (~${example.expectedSimilarity} similarity)`}
+                >
+                  {example.reference.name} vs {example.comparison.name}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <form onSubmit={handleCompareSubmit} className="input-section">
+            <input
+              type="text"
+              value={compareInputSmiles}
+              onChange={(e) => setCompareInputSmiles(e.target.value)}
+              placeholder="Enter SMILES to compare (e.g., CCO, c1ccccc1)"
+              className="smiles-input"
+            />
+            <button
+              type="submit"
+              className="render-btn"
+              disabled={!compareInputSmiles.trim()}
+            >
+              Compare
+            </button>
+            {compareSmiles && (
+              <button
+                type="button"
+                className="clear-btn"
+                onClick={clearComparison}
+              >
+                Clear
+              </button>
+            )}
+          </form>
+
+          {compareSvgHtml && compareProperties && (
+            <div className="comparison-display">
+              {tanimotoScore !== null && (
+                <div className="similarity-score">
+                  <h4>Tanimoto Similarity: {tanimotoScore.toFixed(3)}</h4>
+                  <div className="similarity-bar">
+                    <div
+                      className="similarity-fill"
+                      style={{
+                        width: `${tanimotoScore * 100}%`,
+                        backgroundColor: tanimotoScore > 0.7 ? '#22c55e' : tanimotoScore > 0.3 ? '#eab308' : '#ef4444'
+                      }}
+                    />
+                  </div>
+                  <div className="similarity-labels">
+                    <span>0.0</span>
+                    <span>0.5</span>
+                    <span>1.0</span>
+                  </div>
+                </div>
+              )}
+
+              <div className="molecules-comparison">
+                <div className="molecule-panel">
+                  <h4>Reference Molecule</h4>
+                  <div className="molecule-svg" dangerouslySetInnerHTML={{ __html: svgHtml }} />
+                  <div className="canonical-smiles">{properties?.canonicalSmiles}</div>
+                </div>
+
+                <div className="molecule-panel">
+                  <h4>Comparison Molecule</h4>
+                  <div className="molecule-svg" dangerouslySetInnerHTML={{ __html: compareSvgHtml }} />
+                  <div className="canonical-smiles">{compareProperties.canonicalSmiles}</div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       )}
 
       {!svgHtml && !error && (
